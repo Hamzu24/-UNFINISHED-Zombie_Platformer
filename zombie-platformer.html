@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Zombie-Platformer</title>
+	<style>
+		body {
+			overflow: hidden;
+		}
+	</style>
+</head>
+<body>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script>
+		function Random(min, max) {
+    		return Math.floor(Math.random() * (max - min + 1)) + min;
+    	}
+
+    	var keyState = {};
+		var vars = {
+			playerStats : {facing : 'right', health : 3, immune : false, weapons : 1, equipped : 1, claimed : 1}, 
+			selectedBullet : 0,
+			platforms : 0, 
+			blocks : 0,
+			jumping : 0,
+			monsterJumping : 0,
+			shooting : false,
+			kills : 4,
+			touching : 0,
+			monsterTouching : 0,
+			monsters : 0,
+			bullets : 0,
+			intervals : [null, null, null],
+			randomNumb : 0,
+			monsterStats : {},
+			bulletStats : {}
+		};
+
+    	moveLoop();
+		makePlayer();
+		makePlatform(0, ($(document).height()-1), $(document).width(), 1);
+		makePlatform(200, $(document).height()-250, 150, 25);
+		makeBlock(200, $(document).height()-250, 150, 25);
+		makePlatform($(document).width()-350, $(document).height()-250, 150, 25);
+		makeBlock($(document).width()-350, $(document).height()-250, 150, 25);
+
+		function makePlatform(left, top, width, height) {
+			$('body').append('<div id="platform'+(vars.platforms).toString()+'"></div>');
+			$('#platform'+(vars.platforms).toString()).css('position', 'absolute');
+			$('#platform'+(vars.platforms).toString()).css('width', width.toString()+'px');
+			$('#platform'+(vars.platforms).toString()).css('height', height.toString()+'px');
+			$('#platform'+(vars.platforms).toString()).css('width', width.toString()+'px');
+			$('#platform'+(vars.platforms).toString()).css('left', left.toString()+'px');
+			$('#platform'+(vars.platforms).toString()).css('top', top.toString()+'px');
+			//$('#platform'+(vars.platforms).toString()).css('background-color', 'red');
+			vars.platforms = vars.platforms + 1;
+		}
+
+		function makeBlock(left, top, width, height) {
+			$('body').append('<div id="block'+(vars.blocks).toString()+'"></div>');
+			$('#block'+(vars.blocks).toString()).css('position', 'absolute');
+			$('#block'+(vars.blocks).toString()).css('width', width.toString()+'px');
+			$('#block'+(vars.blocks).toString()).css('height', height.toString()+'px');
+			$('#block'+(vars.blocks).toString()).css('width', width.toString()+'px');
+			$('#block'+(vars.blocks).toString()).css('left', left.toString()+'px');
+			$('#block'+(vars.blocks).toString()).css('top', top.toString()+'px');
+			$('#block'+(vars.blocks).toString()).css('background-color', 'black');
+			vars.blocks = vars.blocks + 1;
+		}
+
+		function makeMonster(type, left) {
+			switch(type) {
+				case 'zombie':
+					$('body').append('<div id="monster'+(vars.monsters).toString()+'"></div>');
+					$('#monster'+(vars.monsters).toString()).css('position', 'absolute');
+					$('#monster'+(vars.monsters).toString()).css('background-color', 'green');
+					$('#monster'+(vars.monsters).toString()).css('width', '75px');
+					$('#monster'+(vars.monsters).toString()).css('height', '75px');
+					$('#monster'+(vars.monsters).toString()).css('left', left.toString()+'px');
+					$('#monster'+(vars.monsters).toString()).css('top', ($(document).height()-$('#monster'+(vars.monsters).toString()).height()).toString()+'px');
+					$('#monster'+(vars.monsters).toString()).css('border-radius', '25px');
+					vars.monsterStats['mon'+vars.monsters] = {};
+					vars.monsterStats['mon'+vars.monsters].type = 'zombie';
+					vars.monsterStats['mon'+vars.monsters].health = 3;
+					vars.monsterStats['mon'+vars.monsters].validity = true;
+					vars.monsterStats['mon'+vars.monsters].jumping = 0;
+					vars.monsterStats['mon'+vars.monsters].touching = 0;
+					vars.monsters = vars.monsters + 1;
+				break;
+			}
+		}
+
+    	function makePlayer() {
+    		$('body').append('<div id="player"></div>');
+    		$('#player').css('width', '75px');
+    		$('#player').css('height', '75px');
+    		$('#player').css('border-radius', '25px');
+    		$('#player').css('background-color', 'orange');
+    		$('#player').css('position', 'absolute');
+    		$('#player').css('top', ($(document).height()-$('#player').height()).toString()+'px');
+    		$('#player').css('left', (($(document).width()/2)-($('#player').height()/2)).toString()+'px');
+    	}
+
+    	function hit() {
+    		vars.playerStats.health = vars.playerStats.health - 1;
+    		$('#player').fadeOut();
+    		$('#player').fadeIn();
+    		$('#player').fadeOut();
+    		$('#player').fadeIn();
+    		setTimeout(function() {
+    			vars.playerStats.immune = false;
+    		}, 1800);
+    	}
+
+    	function monsterJump(i) {
+    		if (vars.monsterStats['mon'+i.toString()].jumping === 0) {
+    			if (vars.monsterStats['mon'+i.toString()].validity === true) {
+	    			vars.monsterStats['mon'+i.toString()].jumping = 2;
+	    			$('#monster'+i.toString()).animate({'top' : '-=250px'}, 700);
+	    			setTimeout(function() {
+						vars.monsterStats['mon'+i.toString()].jumping = 1;
+					}, 710);
+    			}
+    		}
+    	}
+
+    	function moveLoop() {
+		    if (keyState[37] || keyState[65]){
+		    	//left
+		    	if ($('#player').offset().left > 105) {
+			    	$('#player').offset({left: $('#player').offset().left-7, top: $('#player').offset().top});
+			    	vars.playerStats.facing = 'left';
+		    	}
+		    }
+		    
+		    if (keyState[39] || keyState[68]) {
+		        //right
+		        if ($('#player').offset().left + $('#player').width() < $(document).width() - 105) {
+			        $('#player').offset({left: $('#player').offset().left+7, top: $('#player').offset().top});
+			        vars.playerStats.facing = 'right';
+		    	}
+		    }
+			
+			if (keyState[38] || keyState[87]) {
+		        //up
+				if (vars.jumping === 0) {
+					vars.jumping = 2;
+					$('#player').animate({'top' : '-=250px'}, 700);
+					setTimeout(function() {
+						vars.jumping = 1;
+					}, 750);
+				}
+		    }
+		    setTimeout(moveLoop, 20);
+		}
+
+		$(document).keydown(function(e) {
+			var key = e.keyCode;
+			switch(key) {
+				case 32 :
+					if (vars.shooting === false) {
+						vars.shooting = true;
+						switch(vars.playerStats.equipped) {
+							case 1:
+								//knife
+								vars.selectedBullet = vars.bullets;
+								if (vars.playerStats.facing === 'left') {
+									$('body').append('<img src="knife-img.png" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '100px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '25px');
+									$('#bullet'+(vars.bullets).toString()).css('left', ($('#player').offset().left-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+								} else {
+									$('body').append('<img src="knife-img-(r).gif" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '100px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '25px');
+									$('#bullet'+(vars.bullets).toString()).css('left', (($('#player').offset().left+$('#player').width())-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+								}
+								vars.bulletStats['bullet'+(vars.bullets).toString()] = {};
+								vars.bulletStats['bullet'+(vars.bullets).toString()].validity = true;
+								vars.bulletStats['bullet'+(vars.bullets).toString()].type = 'knife';
+								vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 0; //no direction - knife
+
+								setTimeout(function() {
+									$('#bullet'+(vars.selectedBullet).toString()).hide();
+									vars.bulletStats['bullet'+(vars.bullets).toString()].validity = false;
+									vars.bullets = vars.bullets + 1;
+								}, 100);
+								setTimeout(function() {
+									vars.shooting = false;
+								}, 1000);
+							break;
+
+							case 2:
+								//pistol
+								vars.selectedBullet = vars.bullets;
+								vars.bulletStats['bullet'+(vars.bullets).toString()] = {};
+								vars.bulletStats['bullet'+(vars.bullets).toString()].validity = true;
+								vars.bulletStats['bullet'+(vars.bullets).toString()].type = 'pistol';
+								if (vars.playerStats.facing === 'left') {
+									$('body').append('<img src="bullet-img-l.gif" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '75px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '25px');
+									$('#bullet'+(vars.bullets).toString()).css('left', ($('#player').offset().left-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+									vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 1; //left
+								} else {
+									$('body').append('<img src="bullet-img-r.png" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '100px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '25px');
+									$('#bullet'+(vars.bullets).toString()).css('left', (($('#player').offset().left+$('#player').width())-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+									vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 2; //right
+								}
+
+								setTimeout(function() {
+									vars.shooting = false;
+									vars.bullets = vars.bullets + 1;
+								}, 1250);
+							break;
+
+							case 3:
+								//sniper rifle
+								vars.selectedBullet = vars.bullets;
+								vars.bulletStats['bullet'+(vars.bullets).toString()] = {};
+								vars.bulletStats['bullet'+(vars.bullets).toString()].validity = true;
+								vars.bulletStats['bullet'+(vars.bullets).toString()].type = 'sniperRifle';
+								if (vars.playerStats.facing === 'left') {
+									$('body').append('<img src="sniperBullet-img-l.gif" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '125px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '25px');
+									$('#bullet'+(vars.bullets).toString()).css('left', ($('#player').offset().left-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+									vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 1; //left
+								} else {
+									$('body').append('<img src="sniperBullet-img-r.png" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '125px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '25px');
+									$('#bullet'+(vars.bullets).toString()).css('left', (($('#player').offset().left+$('#player').width())-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+									vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 2; //right
+								}
+
+								setTimeout(function() {
+									vars.shooting = false;
+									vars.bullets = vars.bullets + 1;
+								}, 2000);
+							break;
+							
+							case 4:
+								//machine gun
+								vars.selectedBullet = vars.bullets;
+								vars.bulletStats['bullet'+(vars.bullets).toString()] = {};
+								vars.bulletStats['bullet'+(vars.bullets).toString()].validity = true;
+								vars.bulletStats['bullet'+(vars.bullets).toString()].type = 'machineGun';
+								if (vars.playerStats.facing === 'left') {
+									$('body').append('<img src="machineGunBullet-img-l.gif" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '60px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '25px');
+									$('#bullet'+(vars.bullets).toString()).css('left', ($('#player').offset().left-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+									vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 1; //left
+								} else {
+									$('body').append('<img src="machineGunBullet-img-r.png" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '60px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '25px');
+									$('#bullet'+(vars.bullets).toString()).css('left', (($('#player').offset().left+$('#player').width())-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+									vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 2; //right
+								}
+
+								setTimeout(function() {
+									vars.shooting = false;
+									vars.bullets = vars.bullets + 1;
+								}, 250);
+							break;
+
+							case 5:
+								//machete
+								vars.selectedBullet = vars.bullets;
+								vars.bulletStats['bullet'+(vars.bullets).toString()] = {};
+								vars.bulletStats['bullet'+(vars.bullets).toString()].validity = true;
+								vars.bulletStats['bullet'+(vars.bullets).toString()].type = 'machete';
+								if (vars.playerStats.facing === 'left') {
+									$('body').append('<img src="machete-img-l.gif" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '150px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '50px');
+									$('#bullet'+(vars.bullets).toString()).css('left', ($('#player').offset().left-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+									vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 1; //left
+								} else {
+									$('body').append('<img src="machete-img-r.png" id="bullet'+(vars.bullets).toString()+'"/>');
+									$('#bullet'+(vars.bullets).toString()).css('position', 'absolute');
+									$('#bullet'+(vars.bullets).toString()).css('width', '150px');
+									$('#bullet'+(vars.bullets).toString()).css('height', '50px');
+									$('#bullet'+(vars.bullets).toString()).css('left', (($('#player').offset().left+$('#player').width())-($('#bullet'+(vars.bullets).toString()).width()/2)).toString()+'px');
+									$('#bullet'+(vars.bullets).toString()).css('top', (($('#player').offset().top+($('#player').height()/2))-($('#bullet'+(vars.bullets).toString()).height()/2)).toString()+'px');
+									vars.bulletStats['bullet'+(vars.bullets).toString()].direction = 2; //right
+								}
+
+								setTimeout(function() {
+									$('#bullet'+(vars.selectedBullet).toString()).hide();
+									vars.bulletStats['bullet'+(vars.bullets).toString()].validity = false;
+									vars.bullets = vars.bullets + 1;
+								}, 100);
+								setTimeout(function() {
+									vars.shooting = false;
+								}, 1250);
+							break;
+
+						}					
+					}
+				break;
+				case 49:
+					vars.playerStats.equipped = 1;
+				break;
+				case 50:
+					if (vars.playerStats.weapons > 1) {
+						vars.playerStats.equipped = 2;
+					}
+				break;
+				case 51:
+					if (vars.playerStats.weapons > 2) {
+						vars.playerStats.equipped = 3;
+					}
+				break;
+				case 52:
+					if (vars.playerStats.weapons > 3) {
+						vars.playerStats.equipped = 4;
+					}
+				break;
+				case 53:
+					if (vars.playerStats.weapons > 4) {
+						vars.playerStats.equipped = 5;
+					}
+				break;
+			}
+		});
+
+		setInterval(function() {
+			if (vars.jumping !== 2) {
+				for (var i = 0; i < vars.platforms; i++) {
+					if ($('#player').offset().left < $('#platform'+i.toString()).offset().left + $('#platform'+i.toString()).width()) {
+						if ($('#player').offset().left + $('#player').width() > $('#platform'+i.toString()).offset().left) {
+							if ($('#player').offset().top < $('#platform'+i.toString()).offset().top + $('#platform'+i.toString()).height()) {
+								if ($('#player').offset().top + $('#player').height() > $('#platform'+i.toString()).offset().top) {
+									vars.touching = vars.touching + 1;
+								}
+							}
+						}
+					}
+				}
+				if (vars.touching < 1) {
+					$('#player').offset({left: $('#player').offset().left, top: $('#player').offset().top+4});
+					vars.touching = 0;
+				} else {
+					vars.touching = 0;
+					vars.jumping = 0;
+				}
+			}
+			for (var j = 0; j < vars.monsters; j++) {
+				if (vars.monsterStats['mon'+j.toString()].jumping !== 2) {
+					if (vars.monsterStats['mon'+j.toString()].validity === true) {
+						for (var i = 0; i < vars.platforms; i++) {
+							if ($('#monster'+j.toString()).offset().left < $('#platform'+i.toString()).offset().left + $('#platform'+i.toString()).width()) {
+								if ($('#monster'+j.toString()).offset().left + $('#monster'+j.toString()).width() > $('#platform'+i.toString()).offset().left) {
+									if ($('#monster'+j.toString()).offset().top < $('#platform'+i.toString()).offset().top + $('#platform'+i.toString()).height()) {
+										if ($('#monster'+j.toString()).offset().top + $('#monster'+j.toString()).height() > $('#platform'+i.toString()).offset().top) {
+											vars.monsterStats['mon'+j.toString()].touching = vars.monsterStats['mon'+j.toString()].touching + 1;
+										}
+									}
+								}
+							}
+						}
+						if (vars.monsterStats['mon'+j.toString()].touching < 1) {
+							$('#monster'+j.toString()).offset({left: $('#monster'+j.toString()).offset().left, top: $('#monster'+j.toString()).offset().top+4});
+							vars.monsterStats['mon'+j.toString()].touching = 0;
+							console.log('hello');
+						} else {
+							vars.monsterStats['mon'+j.toString()].touching = 0;
+							vars.monsterStats['mon'+i.toString()].jumping = 0;
+						}
+					}
+				}
+			}
+		}, 15);
+
+		setInterval(function() {
+			for (var i = 0; i < vars.monsters; i++) {
+				if (vars.monsterStats['mon'+i.toString()].validity === true) {
+					if ($('#player').offset().left > $('#monster'+i.toString()).offset().left) {
+						//monster goes left
+						$('#monster'+i.toString()).offset({left: $('#monster'+i.toString()).offset().left+1, top: $('#monster'+i.toString()).offset().top});
+					} else {
+						//monster goes right
+						$('#monster'+i.toString()).offset({left: $('#monster'+i.toString()).offset().left-1, top: $('#monster'+i.toString()).offset().top});
+					}
+				}
+			}
+		}, 20);
+
+		setInterval(function() {
+			for (var i = 0; i < vars.monsters; i++) {
+				if (vars.monsterStats['mon'+i.toString()].validity === true) {
+					if ($('#player').offset().left < $('#monster'+i.toString()).offset().left + $('#monster'+i.toString()).width()) {
+						if ($('#player').offset().left + $('#player').width() > $('#monster'+i.toString()).offset().left) {
+							if ($('#player').offset().top < $('#monster'+i.toString()).offset().top + $('#monster'+i.toString()).height()) {
+								if ($('#player').offset().top + $('#player').height() > $('#monster'+i.toString()).offset().top) {
+									if (vars.playerStats.immune === false) {
+										vars.playerStats.immune = true;
+										hit();
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			if (vars.playerStats.health < 1) {
+				$('#player').hide();
+			}
+		}, 15);
+
+		setInterval(function() {
+			for (var j = 0; j < vars.monsters; j++) {
+				if (vars.monsterStats['mon'+j.toString()].validity === true) {
+					for (var i = 0; i < vars.bullets+1; i++) {
+						if (vars.bulletStats['bullet'+i.toString()].validity === true) {
+							console.log(vars.bulletStats['bullet'+i.toString()].validity);
+							if ($('#bullet'+i.toString()).offset().left < $('#monster'+j.toString()).offset().left + $('#monster'+j.toString()).width()) {
+								if ($('#bullet'+i.toString()).offset().left + $('#bullet'+i.toString()).width() > $('#monster'+j.toString()).offset().left) {
+									if ($('#bullet'+i.toString()).offset().top < $('#monster'+j.toString()).offset().top + $('#monster'+j.toString()).height()) {
+										if ($('#bullet'+i.toString()).offset().top + $('#bullet'+i.toString()).height() > $('#monster'+j.toString()).offset().top) {
+											$('#bullet'+i.toString()).hide();
+											vars.bulletStats['bullet'+i.toString()].validity = false;
+											if (vars.bulletStats['bullet'+i.toString()].type === 'pistol' || vars.bulletStats['bullet'+i.toString()].type === 'knife' || vars.bulletStats['bullet'+i.toString()].type === 'machete') {
+												if (vars.monsterStats['mon'+j.toString()].health > 1) {
+													vars.monsterStats['mon'+j.toString()].health = vars.monsterStats['mon'+j.toString()].health - 1;
+												} else {
+													vars.monsterStats['mon'+j.toString()].health = 0;
+													vars.monsterStats['mon'+j.toString()].validity = false;
+													$('#monster'+j.toString()).hide();
+													vars.kills = vars.kills + 1;											
+												}
+											} else if (vars.bulletStats['bullet'+i.toString()].type === 'sniperRifle') {
+												if (vars.monsterStats['mon'+j.toString()].health > 2) {
+													vars.monsterStats['mon'+j.toString()].health = vars.monsterStats['mon'+j.toString()].health - 2;
+												} else {
+													vars.monsterStats['mon'+j.toString()].health = 0;
+													vars.monsterStats['mon'+j.toString()].validity = false;
+													$('#monster'+j.toString()).hide();
+													vars.kills = vars.kills + 1;											
+												}
+											} else if (vars.bulletStats['bullet'+i.toString()].type === 'machineGun') {
+												if (vars.monsterStats['mon'+j.toString()].health > 0.5) {
+													vars.monsterStats['mon'+j.toString()].health = vars.monsterStats['mon'+j.toString()].health - 0.5;
+												} else {
+													vars.monsterStats['mon'+j.toString()].health = 0;
+													vars.monsterStats['mon'+j.toString()].validity = false;
+													$('#monster'+j.toString()).hide();
+													vars.kills = vars.kills + 1;											
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}, 15);
+
+		setInterval(function() {
+			for (var i = 0; i < vars.bullets+1; i++) {
+				if (vars.bulletStats['bullet'+i.toString()].validity !== false) {
+					if (vars.bulletStats['bullet'+i.toString()].type === 'pistol' || vars.bulletStats['bullet'+i.toString()].type === 'machineGun') {
+						if (vars.bulletStats['bullet'+i.toString()].direction === 1) {
+							$('#bullet'+i.toString()).offset({left: $('#bullet'+i.toString()).offset().left-5, top: $('#bullet'+i.toString()).offset().top});
+						} else {
+							$('#bullet'+i.toString()).offset({left: $('#bullet'+i.toString()).offset().left+5, top: $('#bullet'+i.toString()).offset().top});
+						}
+					} else if (vars.bulletStats['bullet'+i.toString()].type === 'sniperRifle') {
+						if (vars.bulletStats['bullet'+i.toString()].direction === 1) {
+							$('#bullet'+i.toString()).offset({left: $('#bullet'+i.toString()).offset().left-10, top: $('#bullet'+i.toString()).offset().top});
+						} else {
+							$('#bullet'+i.toString()).offset({left: $('#bullet'+i.toString()).offset().left+10, top: $('#bullet'+i.toString()).offset().top});
+						}
+					}
+
+					if ($('#bullet'+i.toString()).offset().left > $(document).width() || $('#bullet'+i.toString()).offset().left < 0) {
+						$('#bullet'+i.toString()).hide();
+						vars.bulletStats['bullet'+i.toString()].validity = false;
+					}
+				}
+			}
+		}, 20);
+
+		setInterval(function() {
+			for (var i = 0; i < vars.monsters; i++) {
+				if (vars.monsterStats['mon'+i.toString()].validity === true) {
+					if ($('#player').offset().top < $('#monster'+i.toString()).offset().top) {
+						for (var j = 0; j < vars.platforms; j++) {
+							if ($('#platform'+j.toString()).offset().left < $('#monster'+i.toString()).offset().left + $('#monster'+i.toString()).width()) {
+								if ($('#platform'+j.toString()).offset().left + $('#platform'+j.toString()).width() > $('#monster'+i.toString()).offset().left) {
+									if ($('#platform'+j.toString()).offset().top + $('#block'+(j+1).toString()).height() > $('#monster'+i.toString()).offset().top) {
+										if (vars.monsterStats['mon'+i.toString()].jumping === 0) {
+											monsterJump(i);
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}, 20);
+
+		setInterval(function() {
+			vars.randomNumb = Random(1, 2);
+			if (vars.randomNumb === 1) {
+				randomNumb = Random(0, $('#player').offset().left-100);
+			} else {
+				randomNumb = Random($('#player').offset().left+$('#player').width()+100, $(document).width());
+			}
+			console.log(randomNumb);
+			makeMonster('zombie', randomNumb);
+		}, 7500);
+
+		setInterval(function() {
+			if (vars.playerStats.claimed === 1) {
+				if (vars.kills > 0) {
+					vars.playerStats.claimed = 2;
+					vars.playerStats.weapons = 2;
+					vars.playerStats.equipped = 2;
+					console.log('claimedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee');
+				}
+			}
+		}, 50);
+
+		setInterval(function() {
+			if (vars.playerStats.claimed === 2) {
+				if (vars.kills > 1) {
+					vars.playerStats.claimed = 3;
+					vars.playerStats.weapons = 3;
+					vars.playerStats.equipped = 3;
+					console.log('claimedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee');
+				}
+			}
+		}, 50);
+		
+		setInterval(function() {
+			if (vars.playerStats.claimed === 3) {
+				if (vars.kills > 2) {
+					vars.playerStats.claimed = 4;
+					vars.playerStats.weapons = 4;
+					vars.playerStats.equipped = 4;
+					console.log('claimedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee');
+				}
+			}
+		}, 50);
+
+		setInterval(function() {
+			if (vars.playerStats.claimed === 4) {
+				if (vars.kills > 3) {
+					vars.playerStats.claimed = 5;
+					vars.playerStats.weapons = 5;
+					vars.playerStats.equipped = 5;
+					console.log('claimedeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee');
+				}
+			}
+		}, 50);
+
+		window.addEventListener('keydown',function(e){
+		    keyState[e.keyCode || e.which] = true;
+		},true);
+
+		window.addEventListener('keyup',function(e){
+		    keyState[e.keyCode || e.which] = false;
+		},true);
+	</script>
+</body>
+</html>
